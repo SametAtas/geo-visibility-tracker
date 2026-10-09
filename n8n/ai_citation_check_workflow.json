@@ -1,0 +1,160 @@
+{
+ "id": "aiCitationChk01",
+ "name": "AI answer citation check",
+ "nodes": [
+  {
+   "id": "38e74b47-170d-4b00-816f-94d29ea77daf",
+   "name": "Run it",
+   "type": "n8n-nodes-base.manualTrigger",
+   "typeVersion": 1,
+   "position": [
+    0,
+    0
+   ],
+   "parameters": {}
+  },
+  {
+   "id": "da9aef57-4360-4a32-9cb9-45eddddba1bd",
+   "name": "Sample answers (replace with your data source)",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    220,
+    0
+   ],
+   "parameters": {
+    "jsCode": "// Stand-in for the real data source (a SERP/AI-answer provider or an LLM API via an HTTP Request node).\n// Each keyword is checked 3 times, because AI answers change between runs.\nconst answers = {\n  '台北皮秒雷射推薦': ['推薦露米診所 https://www.lumi-clinic.example/pico 與晨光醫美', '可參考晨光醫美 https://aurora-aesthetics.example/x', '露米診所 https://lumi-clinic.example/pico'],\n  '音波拉提效果':   ['見 https://wiki.example/hifu', 'https://lumi-clinic.example/hifu 有完整說明', '參考 https://health-news.example/hifu'],\n  '皮秒雷射價格': ['', '費用約 6,000 到 12,000 元，見 https://health-news.example/price', '沒有引用來源'],\n};\nconst out = [];\nfor (const [keyword, runs] of Object.entries(answers)) runs.forEach((answer, i) => out.push({ json: { keyword, run: i + 1, answer } }));\nreturn out;\n"
+   }
+  },
+  {
+   "id": "be29851d-54ed-43be-aae3-6af395492501",
+   "name": "Parse citations",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    440,
+    0
+   ],
+   "parameters": {
+    "jsCode": "// Parse cited domains from each AI answer and flag whether the client's domain is cited.\n// No URL class in the n8n sandbox, so hostnames are parsed with a regex.\nconst BRAND = 'lumi-clinic.example';   // the client's domain\nconst hostOf = u => ((u.match(/^https?:\\/\\/([^\\/?#:]+)/i) || [])[1] || '').toLowerCase().replace(/^www\\./, '');\nreturn $input.all().map(({ json }) => {\n  const answer = json.answer || '';\n  const urls = answer.match(/https?:\\/\\/[^\\s)\\]」>，。]+/g) || [];\n  const domains = [...new Set(urls.map(hostOf).filter(Boolean))];\n  return { json: { keyword: json.keyword, run: json.run, cited_domains: domains, brand_cited: domains.includes(BRAND), empty_answer: !answer.trim() } };\n});\n"
+   }
+  },
+  {
+   "id": "fa67a17a-ce0f-4c91-95d5-4fe8a021648d",
+   "name": "Visibility summary",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    660,
+    -120
+   ],
+   "parameters": {
+    "jsCode": "// Visibility rate per keyword and overall, with a 95% Wilson interval (n is small, so the range matters).\nconst wilson = (k, n, z = 1.96) => {\n  if (!n) return [0, 1];\n  const p = k / n, d = 1 + z * z / n, c = (p + z * z / (2 * n)) / d;\n  const h = (z * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n))) / d;\n  return [Math.max(0, c - h), Math.min(1, c + h)];\n};\nconst rows = $input.all().map(i => i.json).filter(r => !r.empty_answer);   // empty answers are not \"not cited\"\nconst byKw = {};\nfor (const r of rows) (byKw[r.keyword] ||= []).push(r.brand_cited);\nconst pct = x => Math.round(x * 100) + '%';\nconst perKeyword = Object.entries(byKw).map(([keyword, v]) => {\n  const k = v.filter(Boolean).length, [lo, hi] = wilson(k, v.length);\n  return { keyword, cited: `${k}/${v.length}`, rate: pct(k / v.length), ci95: `${pct(lo)}-${pct(hi)}` };\n});\nconst k = rows.filter(r => r.brand_cited).length, [lo, hi] = wilson(k, rows.length);\nreturn [{ json: { overall: `${k}/${rows.length} = ${pct(k / rows.length)} (95% CI ${pct(lo)}-${pct(hi)})`, dropped_empty_answers: $input.all().length - rows.length, perKeyword } }];\n"
+   }
+  },
+  {
+   "id": "a95635cf-4c61-4ef1-a8f2-2ade40763e64",
+   "name": "Brand cited?",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2.2,
+   "position": [
+    660,
+    120
+   ],
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "strict",
+      "version": 2
+     },
+     "conditions": [
+      {
+       "id": "d3417fab-4157-4679-a065-8810c046be5d",
+       "leftValue": "={{ $json.brand_cited }}",
+       "rightValue": "",
+       "operator": {
+        "type": "boolean",
+        "operation": "true",
+        "singleValue": true
+       }
+      }
+     ],
+     "combinator": "and"
+    },
+    "options": {}
+   }
+  },
+  {
+   "id": "48c75932-9e67-426b-86a1-dccd35b21890",
+   "name": "Not cited: alert list",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    880,
+    200
+   ],
+   "parameters": {
+    "jsCode": "// Runs only on the IF node's \"false\" branch. Empty answers are a collection problem, not a lost citation,\n// so they are reported separately.\nconst items = $input.all().map(i => i.json);\nconst misses = items.filter(r => !r.empty_answer).map(r => `${r.keyword} (run ${r.run})`);\nconst empty = items.filter(r => r.empty_answer).map(r => `${r.keyword} (run ${r.run})`);\nreturn [{ json: {\n  message: `Brand not cited in ${misses.length} answers: ${misses.join(', ')}`,\n  check_collection: empty.length ? `Empty answers, check the data source: ${empty.join(', ')}` : null,\n} }];\n"
+   }
+  }
+ ],
+ "connections": {
+  "Run it": {
+   "main": [
+    [
+     {
+      "node": "Sample answers (replace with your data source)",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Sample answers (replace with your data source)": {
+   "main": [
+    [
+     {
+      "node": "Parse citations",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Parse citations": {
+   "main": [
+    [
+     {
+      "node": "Visibility summary",
+      "type": "main",
+      "index": 0
+     },
+     {
+      "node": "Brand cited?",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Brand cited?": {
+   "main": [
+    [],
+    [
+     {
+      "node": "Not cited: alert list",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "settings": {
+  "executionOrder": "v1"
+ },
+ "active": false,
+ "pinData": {}
+}

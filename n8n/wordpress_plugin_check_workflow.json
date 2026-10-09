@@ -1,0 +1,107 @@
+{
+  "name": "Weekly blog check via the GEO Signals plugin",
+  "id": "geoPluginCheck01",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "9e3a36df-9c42-4948-b46d-b1aef11c7e37",
+      "name": "Run it",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "877c1baa-eb64-4ff4-bf04-2b8f3cff5d3a",
+              "name": "site_url",
+              "value": "http://127.0.0.1:8899",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b39b7b4b-de3c-4e31-839c-e6cc71c6f269",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.site_url }}/wp-json/geo-signals/v1/summary",
+        "options": {}
+      },
+      "id": "2877548a-b321-4bf8-86a7-8d7c707ff7d1",
+      "name": "Plugin summary (PHP endpoint)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Turn the plugin's blog summary into a short list of problems worth a person's attention.\n// Thresholds are deliberately simple; change them in this node.\nconst s = $input.first().json;\nconst pct = v => parseInt(String(v), 10);\nconst checks = [\n  [pct(s.with_any_external_source) < 80, `Only ${s.with_any_external_source} of posts cite an outside source.`],\n  [pct(s.with_3plus_statistics) < 30, `Only ${s.with_3plus_statistics} of posts have 3 or more statistics.`],\n  [pct(s.with_faq_section) < 20, `Only ${s.with_faq_section} of posts have an FAQ section.`],\n  [pct(s.updated_in_last_180_days) < 50, `Only ${s.updated_in_last_180_days} of posts were updated in the last 180 days.`],\n];\nconst problems = checks.filter(([bad]) => bad).map(([, msg]) => msg);\nreturn [{ json: { site: $('Config').first().json.site_url, posts: s.posts, ok: problems.length === 0, problems } }];\n"
+      },
+      "id": "28dcfb24-a503-4a98-bcc4-51be404e9647",
+      "name": "What needs attention",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Run it": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Plugin summary (PHP endpoint)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plugin summary (PHP endpoint)": {
+      "main": [
+        [
+          {
+            "node": "What needs attention",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "pinData": {}
+}

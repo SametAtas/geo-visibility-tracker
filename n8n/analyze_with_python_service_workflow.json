@@ -1,0 +1,137 @@
+{
+ "id": "geoAnalyzeApi01",
+ "name": "Analyze answers with the Python service",
+ "nodes": [
+  {
+   "id": "8463a42b-f985-4f33-8cc0-341319aad84a",
+   "name": "Run it",
+   "type": "n8n-nodes-base.manualTrigger",
+   "typeVersion": 1,
+   "position": [
+    0,
+    0
+   ],
+   "parameters": {}
+  },
+  {
+   "id": "0dfdd209-396d-4740-a1a3-7c68c0d7f936",
+   "name": "Config",
+   "type": "n8n-nodes-base.set",
+   "typeVersion": 3.4,
+   "position": [
+    110,
+    -160
+   ],
+   "parameters": {
+    "assignments": {
+     "assignments": [
+      {
+       "id": "b45e5373-1198-44eb-8ec8-e316acbd8d34",
+       "name": "api_url",
+       "value": "http://localhost:8000",
+       "type": "string"
+      }
+     ]
+    },
+    "options": {}
+   }
+  },
+  {
+   "id": "3b463e4e-13f8-41e3-80ea-c86f5cebc70e",
+   "name": "Sample answers (replace with your data source)",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    220,
+    0
+   ],
+   "parameters": {
+    "jsCode": "// Stand-in for the real data source (a SERP/AI-answer provider or an LLM API via an HTTP Request node).\n// Each keyword is checked 3 times, because AI answers change between runs.\nconst answers = {\n  '台北皮秒雷射推薦': ['推薦露米診所 https://www.lumi-clinic.example/pico 與晨光醫美', '可參考晨光醫美 https://aurora-aesthetics.example/x', '露米診所 https://lumi-clinic.example/pico'],\n  '音波拉提效果':   ['見 https://zh.wikipedia.org/wiki/GEO', 'https://lumi-clinic.example/hifu 有完整說明', '參考 https://arxiv.org/abs/2311.09735'],\n  '皮秒雷射價格': ['', '費用約 2 萬到 8 萬，見 https://example.com/price', '沒有引用來源'],\n};\nconst out = [];\nfor (const [keyword, runs] of Object.entries(answers)) runs.forEach((answer, i) => out.push({ json: { keyword, run: i + 1, answer } }));\nreturn out;\n"
+   }
+  },
+  {
+   "id": "2201c04f-ef73-473c-a585-797cb8c3fd3e",
+   "name": "Build request body",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    440,
+    0
+   ],
+   "parameters": {
+    "jsCode": "// One request body for the Python service: brand config + every answer collected above.\nreturn [{ json: {\n  client: { name: '露米診所', domain: 'lumi-clinic.example', aliases: ['Lumi Clinic'] },\n  competitors: [{ name: '晨光醫美', domain: 'aurora-aesthetics.example' }],\n  answers: $input.all().map(i => ({ keyword: i.json.keyword, run: i.json.run, engine: 'n8n-demo', text: i.json.answer })),\n} }];"
+   }
+  },
+  {
+   "id": "0d5328dd-11d1-4cea-b8a5-e2cdea63102d",
+   "name": "Analyze (Python service)",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    660,
+    0
+   ],
+   "parameters": {
+    "method": "POST",
+    "url": "={{ $('Config').first().json.api_url }}/analyze",
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={{ JSON.stringify($json) }}",
+    "options": {
+     "timeout": 30000
+    }
+   }
+  }
+ ],
+ "connections": {
+  "Run it": {
+   "main": [
+    [
+     {
+      "node": "Config",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Sample answers (replace with your data source)": {
+   "main": [
+    [
+     {
+      "node": "Build request body",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Build request body": {
+   "main": [
+    [
+     {
+      "node": "Analyze (Python service)",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Config": {
+   "main": [
+    [
+     {
+      "node": "Sample answers (replace with your data source)",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "settings": {
+  "executionOrder": "v1"
+ },
+ "active": false,
+ "pinData": {}
+}

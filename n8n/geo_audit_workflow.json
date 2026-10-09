@@ -1,0 +1,173 @@
+{
+  "name": "GEO audit of a WordPress blog",
+  "nodes": [
+    {
+      "id": "a8c8b425-6ff7-4cd8-8e29-379edffabb86",
+      "name": "Run it",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "b589d8aa-8c33-4331-ab8d-bb9f7de689d9",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ae90237f-df79-4a51-8166-7506a09af4b4",
+              "name": "base_url",
+              "value": "https://wordpress.org/news",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "2fd2f320-80c2-4c30-aa5a-fc623f0cb9a4",
+      "name": "Fetch posts (WP REST API)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "url": "={{ $json.base_url }}/wp-json/wp/v2/posts",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "per_page",
+              "value": "100"
+            },
+            {
+              "name": "_fields",
+              "value": "id,link,modified,modified_gmt,title,content"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "geo-visibility-tracker/0.1 (+https://github.com/SametAtas/geo-visibility-tracker)"
+            }
+          ]
+        },
+        "options": {
+          "pagination": {
+            "pagination": {
+              "paginationMode": "updateAParameterInEachRequest",
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "qs",
+                    "name": "page",
+                    "value": "={{ $pageCount + 1 }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ $pageCount >= Number($response.headers['x-wp-totalpages']) }}",
+              "limitPagesFetched": true,
+              "maxRequests": 20,
+              "requestInterval": 1000
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "162bec41-ac5b-42ce-8896-014155860bcb",
+      "name": "GEO signals per post",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// For each WordPress post: the signals the GEO paper links to AI visibility, plus structure.\n// Same rules as geo_tracker/audit.py and the WordPress plugin; n8n/test_code_nodes.js checks this code\n// against the shared cases in tests/fixtures/signals_cases.json.\n// JavaScript's \\d only matches ASCII digits, Python's matches full-width ones too (３０％), so use \\p{Nd}.\nconst STAT_RE = /(?<![\\p{Nd}.])(?!(?:19|20)\\p{Nd}\\p{Nd}\\s*年)\\p{Nd}[\\p{Nd},]*(?:\\.\\p{Nd}+)?\\s*(?:%|％|萬|億|倍|元|美元|人|次|年)/gu;\nconst FAQ_RE = /FAQ|常見問題|Q\\s*&\\s*A/i;\n// n8n's Code node sandbox has no URL class (found by testing), so hostnames are parsed with a regex\nconst hostOf = u => ((String(u).trim().match(/^https?:\\/\\/([^\\/?#:\\s]+)/i) || [])[1] || '').toLowerCase().replace(/^www\\./, '');\nconst own = hostOf($('Config').first().json.base_url);\nconst isOwn = h => h === own || h.endsWith('.' + own);       // subdomains are ours; look-alikes are not\nconst ENTITIES = { '&nbsp;': ' ', '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '\"', '&#039;': \"'\" };\nconst strip = s => String(s || '')\n  .replace(/<(script|style)\\b[\\s\\S]*?<\\/\\1>/gi, ' ')\n  .replace(/<[^>]+>/g, ' ')\n  .replace(/&nbsp;|&amp;|&lt;|&gt;|&quot;|&#039;/g, m => ENTITIES[m])\n  .replace(/\\s+/g, ' ')\n  .trim();\n\nreturn $input.all().map(({ json: p }) => {\n  const html = (p.content && p.content.rendered) || '';\n  const text = strip(html);\n  const headings = [...html.matchAll(/<h[23][^>]*>([\\s\\S]*?)<\\/h[23]>/gi)].map(m => strip(m[1]));\n  const hosts = new Set(\n    [...html.matchAll(/href=[\"'](https?:\\/\\/[^\"']+)[\"']/gi)].map(m => hostOf(m[1])).filter(h => h && !isOwn(h))\n  );\n  const modified = new Date((p.modified_gmt || p.modified) + 'Z');   // modified_gmt is UTC; modified is local time\n  return {\n    json: {\n      id: p.id,\n      title: strip(p.title && p.title.rendered),\n      link: p.link,\n      chars: [...text.replace(/\\s/g, '')].length,        // zh-TW: characters (code points), not words\n      headings: headings.length,\n      has_faq: headings.some(h => FAQ_RE.test(h)),\n      external_sources: hosts.size,                      // GEO: cite sources\n      statistics: (text.match(STAT_RE) || []).length,    // GEO: statistics\n      quotes: (html.match(/<blockquote/gi) || []).length + (text.match(/「/g) || []).length,\n      tables: (html.match(/<table/gi) || []).length,\n      days_since_update: Math.floor((Date.now() - modified) / 86400000),\n    },\n  };\n});\n"
+      }
+    },
+    {
+      "id": "9b69c925-4297-4867-a1b3-68d91309d2c6",
+      "name": "Blog summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// One summary item for the whole blog (same numbers and rounding as the Python and PHP versions).\nconst rows = $input.all().map(i => i.json);\nconst n = rows.length;\n// Python's format() rounds halves to even (12.5% -> 12%); Math.round would give 13%.\nconst roundHalfEven = x => { const f = Math.floor(x), d = x - f; return d > 0.5 || (d === 0.5 && f % 2 === 1) ? f + 1 : f; };\nconst pct = f => roundHalfEven((rows.filter(f).length / n) * 100) + '%';\nif (!n) return [{ json: { posts: 0 } }];\nconst chars = rows.map(r => r.chars).sort((a, b) => a - b);\nreturn [{\n  json: {\n    posts: n,\n    median_chars: chars[Math.floor(n / 2)],\n    with_any_external_source: pct(r => r.external_sources > 0),\n    with_3plus_statistics: pct(r => r.statistics >= 3),\n    with_quotes: pct(r => r.quotes > 0),\n    with_faq_section: pct(r => r.has_faq),\n    updated_in_last_180_days: pct(r => r.days_since_update <= 180),\n    posts_without_sources: rows.filter(r => r.external_sources === 0).map(r => r.title),\n  },\n}];\n"
+      }
+    }
+  ],
+  "connections": {
+    "Run it": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Fetch posts (WP REST API)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch posts (WP REST API)": {
+      "main": [
+        [
+          {
+            "node": "GEO signals per post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GEO signals per post": {
+      "main": [
+        [
+          {
+            "node": "Blog summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "pinData": {},
+  "id": "geoAuditBlog0001"
+}

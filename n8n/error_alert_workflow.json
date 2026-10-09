@@ -1,0 +1,48 @@
+{
+ "id": "errorAlert00001",
+ "name": "Error alert",
+ "nodes": [
+  {
+   "id": "493ec5d4-6484-4f06-8415-1fcef6230fea",
+   "name": "When another workflow fails",
+   "type": "n8n-nodes-base.errorTrigger",
+   "typeVersion": 1,
+   "position": [
+    0,
+    0
+   ],
+   "parameters": {}
+  },
+  {
+   "id": "c1012871-8c5e-45a9-9703-913c85125022",
+   "name": "Format alert (then send to Slack/Email)",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    220,
+    0
+   ],
+   "parameters": {
+    "jsCode": "// Error workflow: n8n passes details of the failed execution to the Error Trigger.\nconst e = $json.execution || {}, w = $json.workflow || {};\nreturn [{ json: {\n  text: `n8n failure in \"${w.name}\" at node \"${e.lastNodeExecuted}\": ${(e.error && e.error.message) || 'unknown error'}`,\n  execution_url: e.url || null,\n} }];\n"
+   }
+  }
+ ],
+ "connections": {
+  "When another workflow fails": {
+   "main": [
+    [
+     {
+      "node": "Format alert (then send to Slack/Email)",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "settings": {
+  "executionOrder": "v1"
+ },
+ "active": false,
+ "pinData": {}
+}
