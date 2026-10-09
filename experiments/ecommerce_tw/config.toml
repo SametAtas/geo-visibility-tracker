@@ -20,7 +20,7 @@ aliases = ["PChome", "24h購物"]
 [[brands]]
 name = "Yahoo奇摩購物中心"
 domain = "tw.buy.yahoo.com"
-aliases = ["Yahoo購物中心", "Yahoo!奇摩購物中心", "Yahoo奇摩購物", "雅虎購物"]
+aliases = ["Yahoo購物", "Yahoo!奇摩購物中心", "Yahoo奇摩購物", "雅虎購物"]   # "Yahoo購物" also covers 購物中心
 
 [[brands]]
 name = "博客來"

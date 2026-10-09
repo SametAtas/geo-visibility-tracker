@@ -1,51 +1,69 @@
-# Real run: how stable are AI answers about Taiwanese shopping platforms?
+# Real run: three AI engines, the same shopping questions
 
-**Question.** If you ask an AI the same shopping question several times, does it name the same platforms each time? This matters for any agency that checks "is my client visible in AI answers": if the answers move around, a single check per keyword is not a measurement.
+**Question.** If you ask an AI the same shopping question several times, does it name the same platforms each time? And do different AI engines name the same ones? Both matter for any agency that checks "is my client visible in AI answers": if answers move between runs, one check per keyword is not a measurement, and if engines disagree, one engine is not the market.
 
 **Setup (9 October 2026).**
-- 6 everyday questions in Traditional Chinese ([keywords.txt](keywords.txt)), each asked 5 times: 30 answers.
+- 6 everyday questions in Traditional Chinese ([keywords.txt](keywords.txt)), each asked 5 times per engine.
 - 13 Taiwanese platforms tracked ([config.toml](config.toml)).
-- Model: StepFun `step-5-preview` through Nous Portal's OpenAI-compatible proxy.
-- The API received only the question: no system prompt, default temperature.
+- Three engines, all reached through Nous Portal's OpenAI-compatible proxy:
+  - `openai/gpt-chat-latest`, the model behind ChatGPT;
+  - `google/gemini-3.8-flash`;
+  - `stepfun/step-5-preview`.
+- Each API call contained only the question: no system prompt, default temperature. That gave 90 answers, with no errors and no empty answers.
 
-The raw answers are in [answers_2026-10-09_step-5-preview.jsonl](answers_2026-10-09_step-5-preview.jsonl). The report is [docs/report_ecommerce_tw.html](../../docs/report_ecommerce_tw.html), and you can [open it in the browser](https://htmlpreview.github.io/?https://github.com/SametAtas/geo-visibility-tracker/blob/main/docs/report_ecommerce_tw.html).
+The raw answers are in the three `answers_2026-10-09_*.jsonl` files. There are two pages:
+- the engine comparison: [compare_engines_ecommerce_tw.html](../../docs/compare_engines_ecommerce_tw.html) ([open in the browser](https://htmlpreview.github.io/?https://github.com/SametAtas/geo-visibility-tracker/blob/main/docs/compare_engines_ecommerce_tw.html));
+- the single-engine report for StepFun: [report_ecommerce_tw.html](../../docs/report_ecommerce_tw.html).
 
 ## Results
 
-**The big three are stable; everyone else moves.**
-- 蝦皮購物 was named in 30/30 answers, momo購物網 in 28/30 and PChome in 26/30.
-- Below them, rates spread widely: 博客來 17/30 (95% CI 39%-73%), 露天拍賣 15/30, Yahoo奇摩購物中心 13/30, down to 東森購物 2/30.
+**1. How much the answers move depends on the engine.** For each engine, I looked at the question-platform pairs it named at least once. A pair "flips" if the platform appeared in some of the 5 runs but not all.
 
-**Per question, most brand appearances flip between runs.**
-- 53 question-platform pairs had a platform named at least once.
-- Of these, **32 (60%) appeared in some of the 5 runs but not all**, and 16 appeared in only one run.
-- One check of a question disagrees with the majority of its 5 runs **17% of the time**, averaged over those pairs.
-- Two runs of the same question named the same platforms with a mean overlap of 64% (Jaccard).
+| Engine | Pairs that flip | One check disagrees with the majority | Mean overlap between runs |
+|---|---|---|---|
+| Gemini 3.8 Flash | 9 of 32 (28%) | 7% | 88% |
+| GPT (ChatGPT model) | 11 of 36 (31%) | 8% | 85% |
+| StepFun step-5-preview | 32 of 53 (60%) | 17% | 64% |
 
-**An example a client would care about.**
-- For "網購想要隔天到貨，台灣哪個平台最快？" (next-day delivery), 酷澎 (Coupang) was named in **1 of 5** runs, and Yahoo in 2 of 5.
-- A weekly check that asks once would usually report Coupang as "not visible" and occasionally as "visible". Neither is the real picture: the real answer is "about 20% of the time, with a wide interval".
+Even for the most stable engine, more than a quarter of the pairs flip. Asking once is not enough for any of them.
 
-**No answer contained a link.** The model answered from its own knowledge, without web search, so citation rates are 0%. Measuring citations needs an engine that searches, such as an AI search product or a grounded API.
+**2. Engines disagree about specific brands, and the differences are real.**
+- I ran 39 two-proportion tests (13 brands × 3 engine pairs) with a Bonferroni correction, so a difference counts as real only below p = 0.0013.
+- 6 differences pass that bar:
+  - **酷澎 (Coupang):** named in 21/30 GPT answers and 20/30 Gemini answers, but only 4/30 StepFun answers. For the next-day delivery question, GPT and Gemini named it in 5 of 5 runs and StepFun in 1 of 5.
+  - **Yahoo奇摩購物中心:** **0/30 on Gemini**, 16/30 on GPT and 13/30 on StepFun.
+  - **露天拍賣:** 15/30 on StepFun, but 0/30 on GPT and 1/30 on Gemini.
+- The big three (momo, 蝦皮, PChome) are named by every engine in most answers.
 
-## What this means for the method
+**3. GPT and Gemini agree most with each other.** I took the platforms each engine names in most of its runs and measured how much those lists overlap, per question (Jaccard):
+- GPT and Gemini: 84% on average;
+- Gemini and StepFun: 63%;
+- GPT and StepFun: 69%.
 
-- Ask every question several times (here 5), and report rates with intervals, not yes/no.
-- Treat a week-over-week change in a mid-ranked brand with suspicion unless the test says it's real. With 30 answers, a 50% rate has an interval of roughly 33% to 67%.
-- Stability differs by question: the 3C question was the most stable (72% overlap) and the deals question the least (56%).
+**4. No answer contained a link.** All three engines answered from their own knowledge, without web search, so citation rates are 0%. Measuring citations needs a search-grounded engine (an AI search product, or a licensed data provider for Google's AI Overviews).
+
+## What this means for an AI-visibility report
+
+- Ask every question several times and report rates with intervals.
+- Measure more than one engine. A brand can be strong on one engine and invisible on another (Yahoo on Gemini), and a single-engine report would miss that.
+- Test differences before reporting them, and correct for how many comparisons you make.
 
 ## Limits
 
-- One model, one day, 30 answers. Another model, especially one that searches the web, will give different numbers.
-- Brand matching uses names and aliases. "樂天" also matches Rakuten Kobo (e-books), which is counted as 樂天市場.
-- Name discovery (platforms not in the config) is a heuristic. Here it found 旋轉拍賣 and Amazon, but also a feature phrase (比價工具), so its output is for review.
-- A first attempt with Gemini's free tier stopped after 5 answers (daily quota). Those answers are kept in the database under their own engine name and are not part of these results.
+- One day, 30 answers per engine, 6 questions. API answers are not exactly what the ChatGPT or Gemini apps show, and those apps may also search the web.
+- Brand matching uses names and aliases:
+  - "樂天" also matches Rakuten Kobo (e-books).
+  - Checking the raw answers showed GPT writing "Yahoo購物", so that alias was added. That changed GPT's Yahoo count from 15 to 16 (an answer can contain several spellings).
+- Runs of the same question are treated as independent; they aren't fully, so the true uncertainty is a bit larger than the intervals show.
+- An earlier attempt with Gemini's free tier stopped after 5 answers (daily quota). Those answers are not part of these results.
 
 ## Reproduce
 
 ```bash
-python -m geo_tracker collect --config experiments/ecommerce_tw/config.toml --db study.db --date 2026-10-09 \
-       --replay experiments/ecommerce_tw/answers_2026-10-09_step-5-preview.jsonl
-python -m geo_tracker report  --config experiments/ecommerce_tw/config.toml --db study.db --date 2026-10-09 --out report.html
-python -m geo_tracker sql     --config experiments/ecommerce_tw/config.toml --db study.db queries/unstable_answers.sql
+for f in step-5-preview gpt-chat-latest gemini-3.8-flash; do
+  python -m geo_tracker collect --config experiments/ecommerce_tw/config.toml --db study.db --date 2026-10-09 \
+         --replay experiments/ecommerce_tw/answers_2026-10-09_$f.jsonl
+done
+python -m geo_tracker compare --config experiments/ecommerce_tw/config.toml --db study.db --date 2026-10-09 --out compare.html
+python -m geo_tracker sql --config experiments/ecommerce_tw/config.toml --db study.db queries/stability_by_engine.sql
 ```

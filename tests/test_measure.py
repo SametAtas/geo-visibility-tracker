@@ -11,7 +11,7 @@ from geo_tracker import stability
 from geo_tracker.analysis import analyze_rows, summary
 from geo_tracker.answers import OpenAICompatibleAdapter, QuotaExhausted, ReplayAdapter, collect
 from geo_tracker.cli import main
-from geo_tracker.config import Brand, load_config
+from geo_tracker.config import Brand, Config, load_config
 from geo_tracker.discover import candidates, discover
 from geo_tracker.store import Store
 
@@ -159,3 +159,64 @@ def test_published_real_run_reproduces_the_numbers_in_the_readme() -> None:
     coupang = next(p for p in stability.pair_counts(day.answers, cfg.brands)
                    if p.brand == "酷澎" and p.keyword.startswith("網購想要隔天到貨"))
     assert (coupang.k, coupang.n) == (1, 5)
+
+
+def test_engine_comparison_page(tmp_path: Path) -> None:
+    from geo_tracker.compare import agreement, differences, render_comparison
+
+    brands = [A, B, C]
+    a = analyze_rows("d", [("q", "ea", i, "蝦皮 momo", None) for i in range(1, 6)], brands)
+    b = analyze_rows("d", [("q", "eb", i, "蝦皮 <script>" if i < 5 else "博客來", None) for i in range(1, 6)], brands)
+    assert agreement(a, b, brands) == {"q": 0.5}                 # majorities {蝦皮, momo} vs {蝦皮}
+    gaps = differences({"ea": a, "eb": b}, brands)
+    assert gaps[0][0] == "momo購物網" and gaps[0][3].before.value == 1.0 and gaps[0][3].after.value == 0.0
+    html = render_comparison(load_config_text(tmp_path, '[[brands]]\nname = "<b>x</b>"\ndomain = "x.example"\n'),
+                             "d", {"ea": a, "eb": b})
+    assert "<b>x</b>" not in html and "&lt;b&gt;x&lt;/b&gt;" in html
+
+    cfg = tmp_path / "m.toml"
+    cfg.write_text('[[brands]]\nname = "蝦皮購物"\ndomain = "shopee.tw"\naliases = ["蝦皮"]\n[run]\ndb_path = "m.db"\n',
+                   encoding="utf-8")
+    store = Store(tmp_path / "m.db")
+    for i in range(1, 4):
+        store.save("d", "big", "q", i, "蝦皮")
+        store.save("d", "other", "q", i, "x")
+    store.save("d", "tiny", "q", 1, "蝦皮")
+    store.db.close()
+    out = tmp_path / "c.html"
+    assert main(["compare", "--config", str(cfg), "--date", "d", "--min-answers", "3", "--out", str(out)]) == 0
+    page = out.read_text(encoding="utf-8")
+    assert "big" in page and "other" in page and ">tiny<" not in page   # engines below --min-answers are left out
+    assert "Bonferroni" in page
+
+
+def load_config_text(tmp_path: Path, text: str) -> Config:
+    f = tmp_path / "x.toml"
+    f.write_text(text, encoding="utf-8")
+    return load_config(f)
+
+
+def test_three_engine_numbers_in_the_experiment_readme() -> None:
+    """experiments/ecommerce_tw/README.md: per-engine stability, the Bonferroni survivors and Coupang's next-day runs."""
+    from geo_tracker.compare import differences
+
+    exp = Path(__file__).parent.parent / "experiments" / "ecommerce_tw"
+    cfg = load_config(exp / "config.toml")
+    kws = [l.strip() for l in (exp / "keywords.txt").read_text(encoding="utf-8").splitlines()
+           if l.strip() and not l.startswith("#")]
+    store, days = Store(), {}
+    for f in ("step-5-preview", "gpt-chat-latest", "gemini-3.8-flash"):
+        replay = ReplayAdapter(exp / f"answers_2026-10-09_{f}.jsonl")
+        assert collect(replay, kws, 5, store, "2026-10-09").saved == 30
+        days[replay.name] = analyze_rows("d", store.answers("2026-10-09", replay.name), cfg.brands)
+    flips = {e: (s["pairs_flipping"], s["pairs_seen"]) for e, s in
+             ((e, stability.summarize(d.answers, cfg.brands)) for e, d in days.items())}
+    assert flips == {"google/gemini-3.8-flash": (9, 32), "openai/gpt-chat-latest": (11, 36),
+                     "stepfun/step-5-preview": (32, 53)}
+    diffs = differences(days, cfg.brands)
+    real = {(b, e1, e2) for b, e1, e2, ch in diffs if ch.p_value < 0.05 / len(diffs)}
+    assert len(diffs) == 39 and len(real) == 6
+    assert ("Yahoo奇摩購物中心", "google/gemini-3.8-flash", "openai/gpt-chat-latest") in real
+    coupang = {e: next((p.k, p.n) for p in stability.pair_counts(d.answers, cfg.brands)
+                       if p.brand == "酷澎" and p.keyword.startswith("網購想要隔天到貨")) for e, d in days.items()}
+    assert coupang == {"google/gemini-3.8-flash": (5, 5), "openai/gpt-chat-latest": (5, 5), "stepfun/step-5-preview": (1, 5)}
