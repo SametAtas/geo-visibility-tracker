@@ -13,13 +13,17 @@ It contains a Python package, a WordPress plugin in PHP, SQL views and n8n workf
 
 Ask an AI the same question twice and you get different answers. A tool that checks each keyword once and reports "visible: yes" is mostly reporting luck. So here every question is asked several times, every rate comes with a 95% interval, and a week-over-week change is only called real when a significance test agrees.
 
-**A real run shows why.** I asked 6 everyday shopping questions in Traditional Chinese, 5 times each, and tracked 13 Taiwanese platforms ([experiments/ecommerce_tw](experiments/ecommerce_tw)).
-- The big three were stable: 蝦皮 30/30, momo 28/30, PChome 26/30.
-- Below them, **60% of question-platform pairs appeared in some runs but not others**.
-- A single check disagreed with the majority of runs 17% of the time.
-- For the next-day-delivery question, 酷澎 (Coupang) was named in 1 of 5 runs.
+**A real run shows why.** I asked 6 everyday shopping questions in Traditional Chinese to three engines (the ChatGPT model, Gemini and StepFun), 5 times each, and tracked 13 Taiwanese platforms ([experiments/ecommerce_tw](experiments/ecommerce_tw)).
+- **Answers move between runs on every engine.** 28% to 60% of question-platform pairs appeared in some runs but not others.
+- **Engines disagree, and some gaps are real.** These differences passed a Bonferroni-corrected test:
+  - Gemini never named Yahoo購物中心 (0/30), while GPT named it in 16/30 answers.
+  - 酷澎 (Coupang) appeared in 21/30 GPT answers but only 4/30 StepFun answers.
+- **The big three were named everywhere:** momo, 蝦皮 and PChome.
+- **None of the answers linked to a source**, so citations need a search-grounded engine.
 
-The raw answers are in the repo, and the report [opens in the browser](https://htmlpreview.github.io/?https://github.com/SametAtas/geo-visibility-tracker/blob/main/docs/report_ecommerce_tw.html).
+The 90 raw answers are in the repo, and the comparison page [opens in the browser](https://htmlpreview.github.io/?https://github.com/SametAtas/geo-visibility-tracker/blob/main/docs/compare_engines_ecommerce_tw.html).
+
+![Three engines compared](docs/compare_engines.png)
 
 ## What's inside
 
@@ -31,7 +35,8 @@ The raw answers are in the repo, and the report [opens in the browser](https://h
 
 **SQL (`geo_tracker/warehouse.py`, `queries/`)**
 - Derived tables and views over the raw answers: rates with intervals, `LAG` for change vs last period, window sums for share of voice, per-keyword stability.
-- Tests check every view against the Python numbers.
+- Cross-engine queries compare engines' stability and agreement (`queries/stability_by_engine.sql`, `queries/engine_agreement.sql`).
+- Tests check every view and query against the Python numbers.
 
 **WordPress plugin (PHP, `wordpress-plugin/geo-signals/`)**
 - Adds a column to the Posts screen and two read-only REST endpoints for n8n.

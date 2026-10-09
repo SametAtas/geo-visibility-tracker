@@ -14,6 +14,8 @@
 
 **6. Measure stability directly.** Besides rates, the report says how often a brand appeared in some runs of a question but not others, and how often a single check would disagree with the majority of runs. That makes the case for repeats with the client's own data.
 
+**6b. Compare engines, and correct for multiple tests.** A brand can be visible on one engine and missing on another (in the real run, Yahoo購物中心 was 0/30 on Gemini and 16/30 on GPT). The `compare` page tests every brand and engine pair and applies a Bonferroni correction, because 39 tests at p < 0.05 would produce about two false alarms.
+
 **7. Real runs ask the question and nothing else.** No system prompt and the provider's default temperature, because that is the closest an API gets to a person typing the question. Both can be set in the config, and the report names the model. An API answer is still not the same as the ChatGPT app or Google's AI Overviews: for those, a licensed data provider can plug in behind the same `ask(keyword, run)` interface.
 
 **8. No LLM in the measurement path.** Parsing, metrics and fact-checking are deterministic: same input, same output. Using an LLM to judge LLM answers would add its own randomness and errors to the number. An LLM could give a second opinion on `weak` fact-check cells, never the verdict.
