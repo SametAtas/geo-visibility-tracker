@@ -1,0 +1,75 @@
+{
+ "_note": "Shared by tests/test_parity.py (Python) and tests/php/test_signals.php (WordPress plugin). Both implementations must give these exact numbers.",
+ "cases": [
+  {
+   "name": "typical zh-TW article",
+   "own_domain": "www.lumi-clinic.example",
+   "html": "<h2>皮秒雷射是什麼？</h2><p>根據<a href=\"https://www.fda.gov/x\">FDA</a>與<a href=\"https://pubmed.ncbi.nlm.nih.gov/1\">PubMed 研究</a>，治療約需 3 次，價格約 8,000 元，滿意度 92%。</p><p>2025 年的新設備效率提升 1.5 倍。</p><blockquote>醫師說：「術後要防曬。」</blockquote><p>延伸閱讀：<a href=\"https://lumi-clinic.example/a\">本站文章</a>、<a href=\"https://blog.lumi-clinic.example/b\">部落格</a>、<a href=\"https://notlumi-clinic.example/c\">look-alike</a>、<a href=\"https://www.fda.gov/y\">FDA again</a></p><h3>常見問題</h3><h4>不算的標題</h4><table><tr><td>1</td></tr></table>",
+   "expected": {
+    "chars": 120,
+    "headings": 2,
+    "has_faq": true,
+    "external_sources": 3,
+    "statistics": 4,
+    "quotes": 2,
+    "tables": 1
+   }
+  },
+  {
+   "name": "full-width digits and ideographic spaces",
+   "own_domain": "blog.example",
+   "html": "<p>有效率　３０％，費用　２萬　元。</p><p>　　空白　測試</p>",
+   "expected": {
+    "chars": 17,
+    "headings": 0,
+    "has_faq": false,
+    "external_sources": 0,
+    "statistics": 2,
+    "quotes": 0,
+    "tables": 0
+   }
+  },
+  {
+   "name": "Q&A heading written as an entity, script and style ignored",
+   "own_domain": "blog.example",
+   "html": "<h2>Q &amp; A</h2><script>var x = \"50% 不算\";</script><style>.a{width:100%}</style><p>總共 1,200 人參加，<a href=\"http://Example.ORG:8080/p?q=1\">來源</a></p>",
+   "expected": {
+    "chars": 16,
+    "headings": 1,
+    "has_faq": true,
+    "external_sources": 1,
+    "statistics": 1,
+    "quotes": 0,
+    "tables": 0
+   }
+  },
+  {
+   "name": "empty post",
+   "own_domain": "blog.example",
+   "html": "",
+   "expected": {
+    "chars": 0,
+    "headings": 0,
+    "has_faq": false,
+    "external_sources": 0,
+    "statistics": 0,
+    "quotes": 0,
+    "tables": 0
+   }
+  },
+  {
+   "name": "years are dates, not statistics",
+   "own_domain": "blog.example",
+   "html": "<p>1999年、2030 年、第3年、10 年保固、20年。</p>",
+   "expected": {
+    "chars": 26,
+    "headings": 0,
+    "has_faq": false,
+    "external_sources": 0,
+    "statistics": 3,
+    "quotes": 0,
+    "tables": 0
+   }
+  }
+ ]
+}
