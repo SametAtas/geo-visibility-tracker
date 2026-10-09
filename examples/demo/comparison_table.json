@@ -1,0 +1,16 @@
+{
+  "title": "台北皮秒雷射診所比較（AI 產生的示範表格）",
+  "note": "Invented clinics on .example domains. Each cell carries the source it claims and the sentence it relies on.",
+  "cells": [
+    {"entity": "露米診所", "attribute": "價格", "value": "單次 9,000 元起", "source_url": "https://lumi-clinic.example/pico", "evidence": "皮秒雷射單次 9,000 元起"},
+    {"entity": "露米診所", "attribute": "營業時間", "value": "週二至週六 11:00-20:00", "source_url": "https://lumi-clinic.example/pico", "evidence": "營業時間：週二至週六 11:00 至 20:00"},
+    {"entity": "露米診所", "attribute": "醫師人數", "value": "3 位", "source_url": "https://lumi-clinic.example/pico", "evidence": "本院共有 3 位皮膚科專科醫師"},
+    {"entity": "晨光醫美", "attribute": "價格", "value": "單次 7,500 元", "source_url": "https://aurora-aesthetics.example/pico", "evidence": "皮秒雷射療程價格請洽診所"},
+    {"entity": "晨光醫美", "attribute": "醫師人數", "value": "5 位", "source_url": "", "evidence": ""},
+    {"entity": "晨光醫美", "attribute": "地址", "value": "台北市大安區示範路 100 號", "source_url": "https://aurora-aesthetics.example/pico", "evidence": "地址：台北市大安區示範路 100 號"},
+    {"entity": "貝拉診所", "attribute": "價格", "value": "單次 8,000 元", "source_url": "https://bella-clinic.example/pico", "evidence": "皮秒雷射每次 8,000 元"},
+    {"entity": "貝拉診所", "attribute": "營業時間", "value": "週一至週日 10:00-21:00", "source_url": "https://bella-clinic.example/pico", "evidence": "全年無休，每日 10:00-21:00"},
+    {"entity": "貝拉診所", "attribute": "醫師人數", "value": "未明確提及", "source_url": "https://bella-clinic.example/pico", "evidence": ""},
+    {"entity": "貝拉診所", "attribute": "地址", "value": "台北市信義區", "source_url": "https://bella-clinic.example/contact", "evidence": "地址：台北市信義區"}
+  ]
+}

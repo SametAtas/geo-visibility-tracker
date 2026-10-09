@@ -1,0 +1,21 @@
+# Sample configuration. All brands and domains are invented (.example is a reserved TLD).
+[client]
+name = "露米診所"
+domain = "lumi-clinic.example"
+aliases = ["Lumi Clinic"]
+
+[[competitors]]
+name = "晨光醫美"
+domain = "aurora-aesthetics.example"
+aliases = ["Aurora Aesthetics"]
+
+[[competitors]]
+name = "貝拉診所"
+domain = "bella-clinic.example"
+aliases = ["Bella Clinic"]
+
+[run]
+keywords_file = "keywords.txt"
+repeats = 3          # AI answers vary between runs, so every keyword is asked 3 times
+engine = "replay"
+db_path = "demo.db"
