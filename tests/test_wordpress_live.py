@@ -79,3 +79,9 @@ def test_signals_are_recomputed_when_a_post_is_saved() -> None:
     subprocess.run(["php", "-r", php], check=True, capture_output=True)
     after = next(p for p in _plugin_posts() if p["id"] == target["id"])
     assert (after["signals"]["external_sources"], after["signals"]["statistics"]) == (2, 3)
+
+
+def test_rest_endpoints_validate_input_and_are_read_only() -> None:
+    for bad in ({"per_page": 1000}, {"per_page": "abc"}, {"page": 0}):
+        assert httpx.get(f"{URL}/wp-json/geo-signals/v1/posts", params=bad).status_code == 400
+    assert httpx.post(f"{URL}/wp-json/geo-signals/v1/summary").status_code == 404     # GET only
