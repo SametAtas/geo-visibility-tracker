@@ -1,0 +1,73 @@
+# Market study: which Taiwanese online shopping platforms does an AI name for everyday shopping questions,
+# and how much does that change when the same question is asked again?
+# No [client]: every platform is tracked as an equal. Domains are the platforms' real Taiwan domains.
+
+[[brands]]
+name = "蝦皮購物"
+domain = "shopee.tw"
+aliases = ["蝦皮", "Shopee"]
+
+[[brands]]
+name = "momo購物網"
+domain = "momoshop.com.tw"
+aliases = ["momo"]
+
+[[brands]]
+name = "PChome 24h購物"
+domain = "pchome.com.tw"
+aliases = ["PChome", "24h購物"]
+
+[[brands]]
+name = "Yahoo奇摩購物中心"
+domain = "tw.buy.yahoo.com"
+aliases = ["Yahoo購物中心", "Yahoo!奇摩購物中心", "Yahoo奇摩購物", "雅虎購物"]
+
+[[brands]]
+name = "博客來"
+domain = "books.com.tw"
+
+[[brands]]
+name = "酷澎"
+domain = "coupang.com"
+aliases = ["Coupang"]
+
+[[brands]]
+name = "樂天市場"
+domain = "rakuten.com.tw"
+aliases = ["樂天", "Rakuten"]
+
+[[brands]]
+name = "東森購物"
+domain = "etmall.com.tw"
+aliases = ["ETMall", "東森"]
+
+[[brands]]
+name = "露天拍賣"
+domain = "ruten.com.tw"
+aliases = ["露天"]
+
+[[brands]]
+name = "誠品線上"
+domain = "eslite.com"
+aliases = ["誠品"]
+
+[[brands]]
+name = "金石堂"
+domain = "kingstone.com.tw"
+
+[[brands]]
+name = "讀冊生活"
+domain = "taaze.tw"
+aliases = ["TAAZE", "讀冊"]
+
+[[brands]]
+name = "淘寶"
+domain = "taobao.com"
+aliases = ["Taobao"]
+
+[run]
+keywords_file = "keywords.txt"
+repeats = 5            # each question is asked 5 times: the point of the study is how much answers vary
+min_interval = 6.5     # seconds between requests, under typical free-tier limits
+# No temperature and no system prompt: the API gets only the question, with the provider's default settings.
+db_path = "geo.db"
