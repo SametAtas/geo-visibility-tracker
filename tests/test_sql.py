@@ -75,3 +75,33 @@ def test_window_function_change_matches_python(demo: tuple) -> None:
 def test_refresh_is_idempotent(demo: tuple) -> None:
     cfg, store, _ = demo
     assert warehouse.refresh(store, cfg.brands, cfg.client) == warehouse.refresh(store, cfg.brands, cfg.client)
+
+
+def test_engine_queries_match_python() -> None:
+    """queries/stability_by_engine.sql and engine_agreement.sql, on two 'engines' built from the demo weeks."""
+    from pathlib import Path
+
+    cfg = load_config(DEMO / "config.toml")
+    store = Store()
+    kws = load_keywords(cfg.keywords_file)
+    for engine, f in (("engine-a", "answers_week1.jsonl"), ("engine-b", "answers_week2.jsonl")):
+        collect(ReplayAdapter(DEMO / f, name=engine), kws, cfg.repeats, store, "2026-10-09")
+    warehouse.refresh(store, cfg.brands, cfg.client)
+    queries = Path(__file__).parent.parent / "queries"
+    days = {e: analyze_rows("d", store.answers("2026-10-09", e), cfg.brands) for e in ("engine-a", "engine-b")}
+
+    rows = _rows(store, (queries / "stability_by_engine.sql").read_text(encoding="utf-8"))
+    assert {r["engine"] for r in rows} == {"engine-a", "engine-b"}
+    for r in rows:
+        st = stability.summarize(days[r["engine"]].answers, cfg.brands)
+        assert (r["pairs_seen"], r["pairs_flipping"]) == (st["pairs_seen"], st["pairs_flipping"])
+        assert r["single_check_error"] == f"{round(100 * st['mean_single_check_error'])}%"
+
+    majority = {e: {(p.keyword, p.brand) for p in stability.pair_counts(d.answers, cfg.brands) if 2 * p.k > p.n}
+                for e, d in days.items()}
+    agreement = _rows(store, (queries / "engine_agreement.sql").read_text(encoding="utf-8"))
+    assert len(agreement) == len(kws)
+    for r in agreement:
+        a = {b for k, b in majority["engine-a"] if k == r["keyword"]}
+        b = {b for k, b in majority["engine-b"] if k == r["keyword"]}
+        assert r["shared_brands"] == f"{len(a & b)}/{len(a | b)}"

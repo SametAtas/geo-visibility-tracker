@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 import httpx
 
 from . import audit, factcheck, questions, report, warehouse, wordpress
+from .compare import render_comparison
 from .analysis import analyze_rows, summary
 from .answers import OpenAICompatibleAdapter, ReplayAdapter, collect, load_keywords
 from .config import load_config
@@ -86,6 +87,25 @@ def cmd_report(a: argparse.Namespace) -> int:
     Path(a.out).write_text(report.render(cfg, day, prev, questions=qs, factcheck=fc, sample_data=a.sample), encoding="utf-8")
     print(json.dumps(summary(day, cfg.client, cfg.brands, prev), ensure_ascii=False, indent=1))
     print(f"report written to {a.out}", file=sys.stderr)
+    return 0
+
+
+def cmd_compare(a: argparse.Namespace) -> int:
+    """One HTML page comparing engines on the same date. Engines with fewer than --min-answers valid answers
+    (for example a run stopped early by a quota) are left out and listed on stderr."""
+    cfg = _config(a)
+    store = Store(cfg.db_path)
+    rows = store.answers(a.date)
+    names = a.engines.split(",") if a.engines else sorted({r[1] for r in rows})
+    days = {e: analyze_rows(a.date, [r for r in rows if r[1] == e], cfg.brands) for e in names}
+    keep = {e: d for e, d in days.items() if len(d.answers) - d.empty >= a.min_answers}
+    for e in sorted(days.keys() - keep.keys()):
+        print(f"left out {e}: {len(days[e].answers) - days[e].empty} valid answers (< {a.min_answers})", file=sys.stderr)
+    if len(keep) < 2:
+        print("need at least two engines to compare", file=sys.stderr)
+        return 2
+    Path(a.out).write_text(render_comparison(cfg, a.date, keep), encoding="utf-8")
+    print(f"comparison of {', '.join(keep)} written to {a.out}", file=sys.stderr)
     return 0
 
 
@@ -191,6 +211,15 @@ def _data_commands(sub: argparse._SubParsersAction) -> None:
 
 def _analysis_commands(sub: argparse._SubParsersAction) -> None:
     """Commands that analyze answers, blogs, forum titles and tables."""
+    s = sub.add_parser("compare", help="one HTML page comparing AI engines on the same questions and date")
+    s.add_argument("--config", required=True)
+    s.add_argument("--db", help="SQLite file to use instead of the one named in the config")
+    s.add_argument("--date", required=True)
+    s.add_argument("--engines", help="comma-separated engine names (default: all on that date)")
+    s.add_argument("--min-answers", type=int, default=20, help="leave out engines with fewer valid answers")
+    s.add_argument("--out", default="compare.html")
+    s.set_defaults(func=cmd_compare)
+
     s = sub.add_parser("sql", help="rebuild the SQL views and run a query (file ending in .sql, or a string)")
     s.add_argument("--config", required=True)
     s.add_argument("--db", help="SQLite file to use instead of the one named in the config")
