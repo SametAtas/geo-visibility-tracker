@@ -1,0 +1,8 @@
+# rein policy for this repo (https://github.com/SametAtas/rein)
+[policy]
+fail_at = "high"
+warn_at = "low"
+
+[rules]
+# This project processes Traditional Chinese text, so non-ASCII characters in code and tests are intended.
+disabled = ["lint.non-ascii"]
